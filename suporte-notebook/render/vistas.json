@@ -1,0 +1,4 @@
+{"../imagens/principal.png": "nb=1&cam=-330,-700,170&alvo=120,140,70&fov=25&exp=0.85",
+ "../imagens/estrutura.png": "nb=0&cam=-360,-470,300&alvo=110,118,25&fov=26",
+ "../imagens/lateral.png": "nb=0&lados=1&pos=0&fantasma=3,6&orto=1&zoom=5.2&cam=105,-1500,70&alvo=105,0,70",
+ "../imagens/detalhe.png": "nb=0&pos=4&cam=360,-150,120&alvo=165,25,15&fov=24"}

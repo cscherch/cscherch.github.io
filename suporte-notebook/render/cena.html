@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#efece7;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
+
+const P = new URLSearchParams(location.search);
+const W = +P.get('w') || 1600, H = +P.get('h') || 1000;
+const pos = +(P.get('pos') ?? 3), fantasma = P.get('fantasma'), notebook = P.get('nb') === '1';
+const cena = await (await fetch('modelo/cena.json')).json();
+
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setPixelRatio(1); r.setSize(W, H);
+r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = +P.get('exp') || 0.9;
+r.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(P.get('fundo') || '#efece7');
+const pm = new THREE.PMREMGenerator(r);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
+
+const cor = P.get('cor') || '#2a2d31', acento = P.get('acento') || '#c8643a';
+const M = {
+  corpo: new THREE.MeshPhysicalMaterial({ color: cor, roughness: 0.62, metalness: 0.0, clearcoat: 0.15, clearcoatRoughness: 0.6 }),
+  trav: new THREE.MeshPhysicalMaterial({ color: P.get('cor2') || cor, roughness: 0.62, clearcoat: 0.15, clearcoatRoughness: 0.6 }),
+  acento: new THREE.MeshPhysicalMaterial({ color: acento, roughness: 0.85, sheen: 0.6, sheenColor: new THREE.Color(acento) }),
+  metal: new THREE.MeshStandardMaterial({ color: '#16171a', roughness: 0.35, metalness: 0.9 }),
+  alu: new THREE.MeshPhysicalMaterial({ color: '#aeb1b6', roughness: 0.38, metalness: 0.8 }),
+  tela: new THREE.MeshPhysicalMaterial({ color: '#0b0d12', roughness: 0.08, metalness: 0.2, clearcoat: 1 }),
+};
+const loader = new STLLoader();
+async function stl(nome) {
+  let g = loader.parse(await (await fetch('modelo/' + nome + '.stl')).arrayBuffer());
+  g.deleteAttribute('normal'); g = BGU.mergeVertices(g, 1e-3);
+  g = BGU.toCreasedNormals(g, THREE.MathUtils.degToRad(35));
+  return g;
+}
+const grupo = new THREE.Group(); scene.add(grupo);
+async function add(nome, mat, dy = 0, opac = 1) {
+  const m = new THREE.Mesh(await stl(nome), opac < 1 ? mat.clone() : mat);
+  if (opac < 1) { m.material.transparent = true; m.material.opacity = opac; m.material.depthWrite = false; }
+  m.position.y = dy; m.castShadow = opac === 1; m.receiveShadow = true; grupo.add(m); return m;
+}
+const lados = P.get('lados') === '1' ? [0] : [0, cena.off];
+for (const dy of lados) {
+  await add('base', M.corpo, dy); await add('pes', M.acento, dy); await add('paraf_dobr', M.metal, dy);
+  await add('braco_' + pos, M.corpo, dy); await add('silicone_' + pos, M.acento, dy);
+  await add('escora_' + pos, M.corpo, dy); await add('paraf_pivo_' + pos, M.metal, dy);
+  if (fantasma !== null) for (const f of fantasma.split(',')) {
+    await add('braco_' + f, M.corpo, dy, 0.22); await add('escora_' + f, M.corpo, dy, 0.22);
+  }
+}
+if (lados.length === 2) { await add('trav_a', M.trav); await add('trav_b', M.trav); await add('trav_pino', M.metal); }
+
+if (notebook) {
+  const th = THREE.MathUtils.degToRad(cena.pos[pos]);
+  const g = new THREE.Group(); g.position.set(cena.dobr[0], 0, cena.dobr[1]); g.rotation.y = -th; scene.add(g);
+  const yc = (cena.y0 + cena.off + cena.larg) / 2 + 4, larg = 312, prof = 221;
+  const base = new THREE.Mesh(new RoundedBoxGeometry(prof, larg, 15, 6, 5), M.alu);
+  base.position.set(-3.5 + prof / 2, yc, 19.8 + 7.5); base.castShadow = base.receiveShadow = true; g.add(base);
+  const kb = new THREE.Mesh(new RoundedBoxGeometry(110, 270, 1, 2, 0.5), new THREE.MeshPhysicalMaterial({ color: "#3a3c41", roughness: .7 }));
+  kb.position.set(-3.5 + prof * 0.62, yc, 19.8 + 15.1); g.add(kb);
+  const tp = new THREE.Mesh(new RoundedBoxGeometry(70, 110, 0.6, 2, 0.3), new THREE.MeshPhysicalMaterial({ color: '#b5b8bd', roughness: .25, metalness: .7 }));
+  tp.position.set(-3.5 + 45, yc, 19.8 + 15.05); g.add(tp);
+  const hinge = new THREE.Group(); hinge.position.set(-3.5 + prof - 4, yc, 19.8 + 15); g.add(hinge);
+  const ab = THREE.MathUtils.degToRad(110);
+  hinge.rotation.y = ab;
+  const tampa = new THREE.Mesh(new RoundedBoxGeometry(prof - 6, larg, 6, 6, 3), M.alu);
+  tampa.position.set(-(prof - 6) / 2, 0, 3); tampa.castShadow = true; hinge.add(tampa);
+  const tela = new THREE.Mesh(new RoundedBoxGeometry(prof - 18, larg - 14, 0.6, 2, 0.3), M.tela);
+  tela.position.set(-(prof - 6) / 2 - 2, 0, 6.1); hinge.add(tela);
+  // brilho suave na tela
+  const luzTela = new THREE.Mesh(new THREE.PlaneGeometry(prof - 30, larg - 30), new THREE.MeshBasicMaterial({ color: '#2b3d5c', transparent: true, opacity: .55 }));
+  luzTela.position.set(-(prof - 6) / 2 - 2, 0, 6.45); hinge.add(luzTela);
+}
+
+const chao = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.ShadowMaterial({ opacity: 0.22 }));
+chao.receiveShadow = true; scene.add(chao);
+scene.add(new THREE.HemisphereLight('#ffffff', '#d8d2c8', 0.55));
+const sol = new THREE.DirectionalLight('#fff7ee', 2.2);
+sol.position.set(-250, -420, 700); sol.castShadow = true;
+sol.shadow.mapSize.set(4096, 4096); sol.shadow.radius = 6; sol.shadow.bias = -0.0004;
+Object.assign(sol.shadow.camera, { left: -500, right: 500, top: 500, bottom: -500, near: 10, far: 2500 });
+scene.add(sol);
+const rim = new THREE.DirectionalLight('#dfe8ff', 0.8); rim.position.set(500, 400, 300); scene.add(rim);
+
+const cam = (P.get('orto') === '1')
+  ? new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 1, 5000)
+  : new THREE.PerspectiveCamera(+P.get('fov') || 26, W / H, 1, 8000);
+cam.up.set(0, 0, 1);
+const [cx, cy, cz] = (P.get('cam') || '-520,-620,420').split(',').map(Number);
+const [tx, ty, tz] = (P.get('alvo') || '110,128,40').split(',').map(Number);
+cam.position.set(cx, cy, cz); cam.lookAt(tx, ty, tz);
+if (cam.isOrthographicCamera) { cam.zoom = +P.get('zoom') || 3; cam.updateProjectionMatrix(); }
+r.render(scene, cam);
+window.PRONTO = true;
+</script></body></html>
