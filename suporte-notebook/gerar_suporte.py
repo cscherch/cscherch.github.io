@@ -243,8 +243,8 @@ def main():
     pecas = {
         # base: já está com a face de baixo em z=0
         "base.stl": base(),
-        # braço: deitado de lado (face y=0 na mesa) -> todos os furos verticais
-        "braco.stl": braco().rotate((-90, 0, 0)),
+        # braço: deitado de lado (face y=0, a das abas, na mesa) -> furos verticais, sem balanço
+        "braco.stl": braco().rotate((90, 0, 0)),
         "escora.stl": escora_local().rotate((-90, 0, 0)),
         "pino_dobradica.stl": pino(Y_ORELHA_B[1] - Y_ORELHA_A[0]),
         "pino_escora.stl": pino(ESCORA_Y1),
