@@ -1,2 +1,5 @@
 __pycache__/
 canoas-city/package.json
+build/
+canoas-godot/.godot/
+*.import.tmp
