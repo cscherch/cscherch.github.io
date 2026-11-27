@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Canoas City</title>
+<meta name="description" content="Jogo de mundo aberto em 3D ambientado em Canoas, RS — dirija pela BR-116, faça corridas de táxi, entregas de xis e colete cuias de chimarrão.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --acc: #ffd21f; --green: #0b8a3a; --red: #d81e1e; --panel: rgba(10, 14, 20, 0.62); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14; color: #fff; font-family: Rajdhani, system-ui, Arial, sans-serif; user-select: none; -webkit-user-select: none; }
+  #game canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; text-align: center;
+    background: radial-gradient(ellipse at 50% 30%, #1d3b2a 0%, #0b0f14 70%); z-index: 20; }
+  #loading h1 { font-size: clamp(44px, 10vw, 96px); margin: 0; letter-spacing: 2px; line-height: 0.95; text-shadow: 0 6px 30px rgba(0,0,0,.6); }
+  #loading h1 span { background: linear-gradient(90deg, var(--green) 0 33%, var(--red) 33% 66%, var(--acc) 66%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #loading .sub { opacity: .8; font-size: clamp(16px, 3.4vw, 22px); margin: 8px 0 22px; }
+  #loadstatus { color: var(--acc); min-height: 1.4em; font-size: 18px; }
+  #play { display: none; margin-top: 18px; font: 700 26px Rajdhani, Arial; padding: 12px 48px; border: 0; border-radius: 8px; cursor: pointer; color: #111;
+    background: linear-gradient(180deg, #ffe35a, #f0b400); box-shadow: 0 8px 30px rgba(240,180,0,.35); }
+  #play:hover { transform: translateY(-1px); }
+  .controls { margin-top: 26px; display: grid; grid-template-columns: repeat(2, auto); gap: 4px 22px; font-size: 15px; opacity: .85; text-align: left; }
+  .controls b { color: var(--acc); display: inline-block; min-width: 92px; }
+  .note { margin-top: 18px; font-size: 13px; opacity: .55; max-width: 640px; }
+
+  #hud { display: none; pointer-events: none; }
+  #money { position: fixed; top: 16px; right: 18px; font-size: 34px; font-weight: 700; color: #7dff9a; text-shadow: 0 2px 6px #000, 0 0 2px #000; }
+  #clock { position: fixed; top: 54px; right: 18px; font-size: 22px; font-weight: 600; text-shadow: 0 2px 4px #000; }
+  #place { position: fixed; bottom: 22px; left: 250px; font-size: 20px; line-height: 1.15; text-shadow: 0 2px 4px #000; }
+  #place b { font-size: 26px; color: var(--acc); }
+  #minimap { position: fixed; left: 16px; bottom: 16px; width: 220px; height: 220px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+  #vehicle { position: fixed; right: 16px; bottom: 10px; display: none; }
+  #speedo { width: 220px; height: 170px; }
+  #mission { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); background: var(--panel); border-left: 4px solid var(--acc); padding: 10px 16px; border-radius: 6px;
+    max-width: min(560px, 80vw); font-size: 18px; display: none; backdrop-filter: blur(4px); }
+  #mission .mt { font-weight: 700; color: var(--acc); font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
+  #mission .mx { font-size: 13px; opacity: .6; margin-top: 4px; }
+  #timer { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); font-size: 40px; font-weight: 700; display: none; text-shadow: 0 2px 6px #000; }
+  #timer.warn { color: #ff4a4a; }
+  #toasts { position: fixed; top: 96px; right: 18px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; max-width: 60vw; }
+  .toast { background: var(--panel); padding: 8px 14px; border-radius: 6px; font-size: 18px; border-right: 4px solid #8ab4ff; transition: opacity .6s, transform .6s; backdrop-filter: blur(4px); }
+  .toast.good { border-color: #4dff88; } .toast.bad { border-color: #ff5a5a; }
+  .toast.out { opacity: 0; transform: translateX(30px); }
+  #hint { position: fixed; bottom: 250px; left: 50%; transform: translateX(-50%); background: var(--panel); padding: 8px 16px; border-radius: 6px; font-size: 20px; opacity: 0; transition: opacity .2s; }
+  #hint b { color: var(--acc); }
+  #help { position: fixed; top: 16px; left: 16px; font-size: 14px; opacity: .55; text-shadow: 0 1px 3px #000; }
+  #bigmap { position: fixed; inset: 0; width: 100%; height: 100%; display: none; z-index: 10; }
+  #pause { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,.6); z-index: 15; font-size: 42px; font-weight: 700; }
+  #pause small { font-size: 18px; opacity: .7; font-weight: 500; }
+  #touch { display: none; }
+  #touch button { position: fixed; pointer-events: auto; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(0,0,0,.35); color: #fff; font: 700 22px Rajdhani, Arial; z-index: 12; }
+  #touch button.on { background: rgba(255,210,31,.5); }
+  @media (max-width: 720px) {
+    #minimap { width: 140px; height: 140px; left: 10px; top: 10px; bottom: auto; }
+    #place { left: 160px; top: 12px; bottom: auto; font-size: 15px; } #place b { font-size: 18px; }
+    #money { font-size: 24px; top: 10px; right: 10px; } #clock { top: 40px; right: 10px; font-size: 16px; }
+    #speedo { width: 150px; height: 116px; } #vehicle { right: 50%; transform: translateX(50%); bottom: 4px; }
+    #help { display: none; } #mission { top: 160px; font-size: 15px; } #hint { bottom: 200px; }
+    .controls { grid-template-columns: 1fr; }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="loading">
+  <h1>CANOAS <span>CITY</span></h1>
+  <div class="sub">Mundo aberto em Canoas, RS — BR-116, Trensurb, Mathias Velho, Guajuviras e muito mais</div>
+  <div id="loadstatus">Iniciando…</div>
+  <button id="play">JOGAR</button>
+  <div class="controls">
+    <div><b>WASD / setas</b> andar / dirigir</div>
+    <div><b>Mouse</b> girar câmera</div>
+    <div><b>F</b> entrar / sair / pegar carro</div>
+    <div><b>Espaço</b> freio de mão / pular</div>
+    <div><b>Shift</b> correr</div>
+    <div><b>H</b> buzina</div>
+    <div><b>M</b> mapa da cidade</div>
+    <div><b>C</b> câmera · <b style="min-width:0">roda</b> zoom</div>
+    <div><b>R</b> desvirar / voltar à rua</div>
+    <div><b>N</b> avançar 3 horas</div>
+    <div><b>Q</b> gráficos alto / rápido</div>
+    <div><b>P</b> pausa · <b style="min-width:0">K</b> som</div>
+  </div>
+  <div class="note">Missões: siga os marcadores coloridos (Táxi Canoas, Tele-Xis, Rally da BR-116, Tour de Canoas). Colete as 30 cuias de chimarrão espalhadas pela cidade.</div>
+</div>
+
+<div id="hud">
+  <canvas id="minimap" width="440" height="440"></canvas>
+  <div id="place"></div>
+  <div id="money">R$ 0</div>
+  <div id="clock">--:--</div>
+  <div id="help">F carro · M mapa · C câmera · P pausa</div>
+  <div id="mission"></div>
+  <div id="timer"></div>
+  <div id="toasts"></div>
+  <div id="hint"></div>
+  <div id="vehicle"><canvas id="speedo" width="440" height="340"></canvas></div>
+</div>
+<canvas id="bigmap"></canvas>
+<div id="pause">PAUSADO<small>P para continuar</small></div>
+
+<div id="touch">
+  <button data-k="left" style="left:16px;bottom:96px">◀</button>
+  <button data-k="right" style="left:96px;bottom:96px">▶</button>
+  <button data-k="up" style="right:16px;bottom:110px">▲</button>
+  <button data-k="down" style="right:16px;bottom:30px">▼</button>
+  <button data-k="brake" style="right:96px;bottom:30px">⎍</button>
+  <button id="t-f" style="right:96px;bottom:110px">F</button>
+  <button id="t-h" style="left:16px;bottom:176px;width:52px;height:52px">📯</button>
+  <button id="t-m" style="left:96px;bottom:176px;width:52px;height:52px">🗺</button>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
